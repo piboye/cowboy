@@ -112,6 +112,7 @@
 
 %% Misc API.
 -export([compact/1]).
+-export([compact2/1]).
 -export([lock/1]).
 -export([to_list/1]).
 
@@ -959,7 +960,7 @@ reply(Status, Headers, Body, Req=#http_req{
 			{RespType, Req2} = response(Status, Headers, RespHeaders, [
 					{<<"connection">>, <<"close">>},
 					{<<"date">>, cowboy_clock:rfc1123()},
-					{<<"server">>, <<"Cowboy">>},
+                    {<<"server">>, <<"qqmusic">>},
 					{<<"transfer-encoding">>, <<"identity">>}
 				], <<>>, Req),
 			if	RespType =/= hook, Method =/= <<"HEAD">> ->
@@ -987,7 +988,7 @@ reply(Status, Headers, Body, Req=#http_req{
 			{RespType, Req2} = response(Status, Headers, RespHeaders, [
 					{<<"content-length">>, integer_to_list(ContentLength)},
 					{<<"date">>, cowboy_clock:rfc1123()},
-					{<<"server">>, <<"Cowboy">>}
+					{<<"server">>, <<"qqmusic">>}
 				|HTTP11Headers], <<>>, Req),
 			if	RespType =/= hook, Method =/= <<"HEAD">> ->
 					BodyFun(Socket, Transport);
@@ -1029,7 +1030,7 @@ reply_may_compress(Status, Headers, Body, Req,
 					{<<"content-length">>, integer_to_list(byte_size(GzBody))},
 					{<<"content-encoding">>, <<"gzip">>},
 					{<<"date">>, cowboy_clock:rfc1123()},
-					{<<"server">>, <<"Cowboy">>}
+					{<<"server">>, <<"qqmusic">>}
 				|HTTP11Headers],
 				case Method of <<"HEAD">> -> <<>>; _ -> GzBody end,
 				Req2),
@@ -1044,7 +1045,7 @@ reply_no_compress(Status, Headers, Body, Req,
 	{_, Req2} = response(Status, Headers, RespHeaders, [
 			{<<"content-length">>, integer_to_list(BodySize)},
 			{<<"date">>, cowboy_clock:rfc1123()},
-			{<<"server">>, <<"Cowboy">>}
+			{<<"server">>, <<"qqmusic">>}
 		|HTTP11Headers],
 		case Method of <<"HEAD">> -> <<>>; _ -> Body end,
 		Req),
@@ -1203,6 +1204,16 @@ compact(Req) ->
 		bindings=undefined, headers=[],
 		p_headers=[], cookies=[]}.
 
+compact2(Req) ->
+			Req#http_req{host_info=undefined,
+			path_info=undefined, qs_vals=undefined,
+			bindings=undefined, headers=[],
+			p_headers=[], cookies=[],
+			host = undefined, path = undefined,
+			peer=undefined,
+			qs = undefined
+}
+.
 %% @doc Prevent any further responses.
 %% @private
 -spec lock(Req) -> Req when Req::req().
@@ -1230,7 +1241,7 @@ chunked_response(Status, Headers, Req=#http_req{
 	end,
 	{RespType, Req2} = response(Status, Headers, RespHeaders, [
 		{<<"date">>, cowboy_clock:rfc1123()},
-		{<<"server">>, <<"Cowboy">>}
+		{<<"server">>, <<"qqmusic">>}
 	|HTTP11Headers], <<>>, Req),
 	{RespType, Req2#http_req{connection=RespConn, resp_state=chunks,
 			resp_headers=[], resp_body= <<>>}}.
@@ -1501,17 +1512,17 @@ connection_to_atom_test_() ->
 
 merge_headers_test_() ->
 	Tests = [
-		{[{<<"content-length">>,<<"13">>},{<<"server">>,<<"Cowboy">>}],
+		{[{<<"content-length">>,<<"13">>},{<<"server">>,<<"qqmusic">>}],
 		 [{<<"set-cookie">>,<<"foo=bar">>},{<<"content-length">>,<<"11">>}],
 		 [{<<"set-cookie">>,<<"foo=bar">>},
 		  {<<"content-length">>,<<"13">>},
-		  {<<"server">>,<<"Cowboy">>}]},
-		{[{<<"content-length">>,<<"13">>},{<<"server">>,<<"Cowboy">>}],
+		  {<<"server">>,<<"qqmusic">>}]},
+		{[{<<"content-length">>,<<"13">>},{<<"server">>,<<"qqmusic">>}],
 		 [{<<"set-cookie">>,<<"foo=bar">>},{<<"set-cookie">>,<<"bar=baz">>}],
 		 [{<<"set-cookie">>,<<"bar=baz">>},
 		  {<<"set-cookie">>,<<"foo=bar">>},
 		  {<<"content-length">>,<<"13">>},
-		  {<<"server">>,<<"Cowboy">>}]}
+		  {<<"server">>,<<"qqmusic">>}]}
 	],
 	[fun() -> Res = merge_headers(L,R) end || {L, R, Res} <- Tests].
 

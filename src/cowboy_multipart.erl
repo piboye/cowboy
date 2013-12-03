@@ -251,12 +251,12 @@ multipart_test_() ->
 		{
 			<<
 				"--boundary\r\nX-Name:answer\r\n\r\n42"
-				"\r\n--boundary\r\nServer:Cowboy\r\n\r\nIt rocks!\r\n"
+				"\r\n--boundary\r\nServer:qqmusic\r\n\r\nIt rocks!\r\n"
 				"\r\n--boundary--"
 			>>,
 			[
 				{[{<<"x-name">>, <<"answer">>}], <<"42">>},
-				{[{<<"server">>, <<"Cowboy">>}], <<"It rocks!\r\n">>}
+				{[{<<"server">>, <<"qqmusic">>}], <<"It rocks!\r\n">>}
 			]
 		}
 	],

@@ -99,30 +99,59 @@ get_value(Key, Opts, Default) ->
 		_ -> Default
 	end.
 
+-spec recv_mark(inet:socket(), module(), non_neg_integer() | infinity)
+	-> {ok, binary()} | {error, closed | timeout | atom()}.
+recv_mark(Socket, Transport, infinity) ->
+	Transport:recv(Socket, 4, infinity);
+recv_mark(Socket, Transport, Until) ->
+	{Me, S, Mi} = os:timestamp(),
+	Now = Me * 1000000000 + S * 1000 + Mi div 1000,
+	Timeout = Until - Now,
+	if	Timeout < 0 ->
+			{error, timeout};
+		true ->
+			Transport:recv(Socket, 4, Timeout)
+	end.
+
+
 %% @private
 -spec init(any(), inet:socket(), module(), any()) -> ok.
 init(Ref, Socket, Transport, Opts) ->
+  inet:setopts(Socket, [{linger, {true, 1}}]), % rest invalid request
 	Compress = get_value(compress, Opts, false),
 	MaxEmptyLines = get_value(max_empty_lines, Opts, 5),
 	MaxHeaderNameLength = get_value(max_header_name_length, Opts, 64),
 	MaxHeaderValueLength = get_value(max_header_value_length, Opts, 4096),
 	MaxHeaders = get_value(max_headers, Opts, 100),
-	MaxKeepalive = get_value(max_keepalive, Opts, 100),
+	MaxKeepalive = get_value(max_keepalive, Opts, 0),
 	MaxRequestLineLength = get_value(max_request_line_length, Opts, 4096),
 	Middlewares = get_value(middlewares, Opts, [cowboy_router, cowboy_handler]),
 	Env = [{listener, Ref}|get_value(env, Opts, [])],
 	OnRequest = get_value(onrequest, Opts, undefined),
 	OnResponse = get_value(onresponse, Opts, undefined),
 	Timeout = get_value(timeout, Opts, 5000),
+	Until = until(Timeout),
 	ok = ranch:accept_ack(Ref),
-	wait_request(<<>>, #state{socket=Socket, transport=Transport,
-		middlewares=Middlewares, compress=Compress, env=Env,
-		max_empty_lines=MaxEmptyLines, max_keepalive=MaxKeepalive,
-		max_request_line_length=MaxRequestLineLength,
-		max_header_name_length=MaxHeaderNameLength,
-		max_header_value_length=MaxHeaderValueLength, max_headers=MaxHeaders,
-		onrequest=OnRequest, onresponse=OnResponse,
-		timeout=Timeout, until=until(Timeout)}, 0).
+	case recv_mark(Socket, Transport, Until) of
+			{ok, <<"QQMS">>} ->
+					[Handler, HandlerOpts] = get_value(bin_protocol_handler, Env, []),	
+			  	Handler:init(Ref, Socket, Transport, HandlerOpts);
+			{ok, Data} ->
+				gen_tcp:unrecv(Socket,Data),	
+				wait_request(<<>>, #state{socket=Socket, transport=Transport,
+					middlewares=Middlewares, compress=Compress, env=Env,
+					max_empty_lines=MaxEmptyLines, max_keepalive=MaxKeepalive,
+					max_request_line_length=MaxRequestLineLength,
+					max_header_name_length=MaxHeaderNameLength,
+					max_header_value_length=MaxHeaderValueLength, max_headers=MaxHeaders,
+					onrequest=OnRequest, onresponse=OnResponse,
+					timeout=Timeout, until=until(Timeout)}, 0);
+			_ ->
+				Transport:close(Socket),
+				ok
+	end
+.
+			
 
 -spec until(timeout()) -> non_neg_integer() | infinity.
 until(infinity) ->
@@ -531,8 +560,10 @@ resume(State, Env, Tail, Module, Function, Args) ->
 		{ok, Req2, Env2} ->
 			execute(Req2, State, Env2, Tail);
 		{suspend, Module2, Function2, Args2} ->
+			%error_logger:error_msg("resume hibernate in ~p:~p([~p])", [Module2, Function2, Args2]),
 			erlang:hibernate(?MODULE, resume,
-				[State, Env, Tail, Module2, Function2, Args2]);
+				[State#state{env=[], middlewares=[]}, [], [], Module2, Function2, Args2]);
+				%[State, Env, Tail, Module2, Function2, Args2]);
 		{halt, Req2} ->
 			next_request(Req2, State, ok);
 		{error, Code, Req2} ->
@@ -540,8 +571,7 @@ resume(State, Env, Tail, Module, Function, Args) ->
 	end.
 
 -spec next_request(cowboy_req:req(), #state{}, any()) -> ok.
-next_request(Req, State=#state{req_keepalive=Keepalive, timeout=Timeout},
-		HandlerRes) ->
+next_request(Req, State=#state{req_keepalive=Keepalive, timeout=Timeout}, HandlerRes) ->
 	cowboy_req:ensure_response(Req, 204),
 	%% If we are going to close the connection,
 	%% we do not want to attempt to skip the body.
@@ -563,6 +593,7 @@ next_request(Req, State=#state{req_keepalive=Keepalive, timeout=Timeout},
 					terminate(State)
 			end
 	end.
+
 
 %% Only send an error reply if there is no resp_sent message.
 -spec error_terminate(cowboy_http:status(), cowboy_req:req(), #state{}) -> ok.

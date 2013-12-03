@@ -57,7 +57,8 @@ execute(Req, Env) ->
 		false -> 5000;
 		{_, MaxBuffer0} -> MaxBuffer0
 	end,
-	handler_init(Req, #state{env=Env, loop_max_buffer=MaxBuffer},
+	%handler_init(Req, #state{env=Env, loop_max_buffer=MaxBuffer},
+	handler_init(Req, #state{env=[], loop_max_buffer=MaxBuffer},
 		Handler, HandlerOpts).
 
 -spec handler_init(Req, #state{}, module(), any())
